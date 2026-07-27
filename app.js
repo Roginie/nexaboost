@@ -85,7 +85,8 @@ const BASE_CONHECIMENTO = [
   // Windows & energia
   { categoria: 'Windows & energia', dificuldade: 'fácil', impacto: 'alto',
     titulo: 'Ativar o plano de energia "Alto desempenho"',
-    desc: 'Em Configurações > Sistema > Energia, troque o plano de energia para "Alto desempenho" ou "Melhor desempenho". Em notebooks, mantenha na tomada ao jogar.',
+    desc: 'Em Configurações > Sistema > Energia, troque o plano de energia para "Alto desempenho" ou "Melhor desempenho". Em notebooks, mantenha na tomada ao jogar. Ou copie o comando abaixo e cole no Prompt de Comando.',
+    comando: 'powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c',
     condicao: () => true },
   { categoria: 'Windows & energia', dificuldade: 'fácil', impacto: 'médio',
     titulo: 'Ativar o Modo de Jogo do Windows',
@@ -151,7 +152,8 @@ const BASE_CONHECIMENTO = [
     condicao: () => true },
   { categoria: 'Armazenamento', dificuldade: 'avançado', impacto: 'baixo',
     titulo: 'Confirmar que o TRIM está ativo no SSD',
-    desc: 'Abra o Prompt de Comando como administrador e rode: fsutil behavior query DisableDeleteNotify — se o resultado for 0, o TRIM já está ativo (bom sinal).',
+    desc: 'Copie o comando abaixo, cole no Prompt de Comando como administrador e rode. Se o resultado for 0, o TRIM já está ativo (bom sinal).',
+    comando: 'fsutil behavior query DisableDeleteNotify',
     condicao: s => s.storage === 'ssd' || s.storage === 'nvme' },
   { categoria: 'Armazenamento', dificuldade: 'médio', impacto: 'médio',
     titulo: 'Desfragmentar o HD tradicional periodicamente',
@@ -208,6 +210,11 @@ const BASE_CONHECIMENTO = [
   { categoria: 'Rede', dificuldade: 'fácil', impacto: 'baixo',
     titulo: 'Reiniciar o roteador antes de sessões longas',
     desc: 'Roteadores acumulam instabilidade com o tempo ligado. Um reinício simples resolve boa parte dos picos de ping esporádicos.',
+    condicao: s => s.jogoTipo === 'online' },
+  { categoria: 'Rede', dificuldade: 'fácil', impacto: 'baixo',
+    titulo: 'Limpar o cache de DNS',
+    desc: 'Um cache de DNS desatualizado pode causar demora ou falha momentânea pra conectar nos servidores do jogo. Copie o comando abaixo e cole no Prompt de Comando.',
+    comando: 'ipconfig /flushdns',
     condicao: s => s.jogoTipo === 'online' },
 ];
 
@@ -270,6 +277,10 @@ function detectarSpecs() {
   document.getElementById('deteccao-nota').textContent = notas.join(' ');
 }
 
+function escapeAttr(texto) {
+  return texto.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
 // ── RENDER DO RESULTADO ────────────────────────────────────────
 function renderResultado(plano) {
   const { nivel, categorias } = plano;
@@ -295,6 +306,11 @@ function renderResultado(plano) {
               </span>
             </div>
             <p class="rec-desc">${item.desc}</p>
+            ${item.comando ? `
+              <div class="rec-comando">
+                <code>${item.comando}</code>
+                <button type="button" class="btn-copiar" data-comando="${escapeAttr(item.comando)}">Copiar comando</button>
+              </div>` : ''}
           </div>`).join('')}
       </div>
     </div>`).join('');
@@ -328,6 +344,18 @@ function lerSpecsDoFormulario() {
   };
 }
 
+async function copiarComando(botao) {
+  const comando = botao.dataset.comando;
+  try {
+    await navigator.clipboard.writeText(comando);
+    const textoOriginal = botao.textContent;
+    botao.textContent = 'Copiado';
+    setTimeout(() => { botao.textContent = textoOriginal; }, 2000);
+  } catch {
+    botao.textContent = 'Não foi possível copiar — selecione o texto manualmente';
+  }
+}
+
 function init() {
   document.getElementById('btn-detectar').addEventListener('click', detectarSpecs);
 
@@ -336,6 +364,11 @@ function init() {
     const specs = lerSpecsDoFormulario();
     const plano = gerarPlano(specs);
     renderResultado(plano);
+  });
+
+  document.getElementById('resultado-conteudo').addEventListener('click', e => {
+    const botao = e.target.closest('.btn-copiar');
+    if (botao) copiarComando(botao);
   });
 }
 

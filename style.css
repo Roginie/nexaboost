@@ -123,6 +123,22 @@ main { max-width: 1680px; margin: 0 auto; padding: 10px clamp(20px, 4vw, 64px) 4
 .rec-tag { font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.7rem; color: var(--cinza-fraco); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
 .rec-desc { color: var(--cinza); font-size: 0.86rem; margin-top: 6px; line-height: 1.55; }
 
+.rec-comando {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; background: var(--card-2); border: 1px solid var(--linha);
+  border-radius: 6px; padding: 8px 10px;
+}
+.rec-comando code {
+  font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.82rem;
+  color: var(--verde); flex: 1 1 auto; word-break: break-all;
+}
+.btn-copiar {
+  font-family: inherit; font-size: 0.76rem; font-weight: 500; color: var(--branco);
+  background: transparent; border: 1px solid var(--acento); border-radius: 5px;
+  padding: 5px 10px; cursor: pointer; white-space: nowrap;
+}
+.btn-copiar:hover { background: var(--acento); color: #0d0e12; }
+
 /* ── SOBRE ──────────────────────────────────────────────── */
 .sobre-texto { color: var(--cinza); font-size: 0.9rem; max-width: 760px; }
 
