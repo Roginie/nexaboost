@@ -25,14 +25,36 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 400;
   min-height: 100vh;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 42px 42px;
   color: var(--branco);
   line-height: 1.6;
+}
+
+body::before {
+  content: "";
+  position: fixed; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--acento); opacity: 0.7; z-index: 5;
 }
 
 h1, h2, h3 { line-height: 1.2; font-weight: 600; }
 a { color: var(--acento); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+.status-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--verde); margin-right: 8px; vertical-align: middle;
+  box-shadow: 0 0 0 0 rgba(111,191,127,0.55);
+  animation: pulse-dot 2.2s infinite;
+}
+@keyframes pulse-dot {
+  0% { box-shadow: 0 0 0 0 rgba(111,191,127,0.55); }
+  70% { box-shadow: 0 0 0 6px rgba(111,191,127,0); }
+  100% { box-shadow: 0 0 0 0 rgba(111,191,127,0); }
+}
 
 /* ── HERO ───────────────────────────────────────────────── */
 .hero { max-width: 1680px; margin: 0 auto; padding: 50px clamp(20px, 4vw, 64px) 20px; }
@@ -81,10 +103,10 @@ main { max-width: 1680px; margin: 0 auto; padding: 10px clamp(20px, 4vw, 64px) 4
 
 /* ── RESULTADO ──────────────────────────────────────────── */
 .nivel-card {
-  background: var(--card-1); border: 1px solid var(--linha); border-radius: var(--radius);
-  padding: 20px 22px; margin-bottom: 22px;
+  background: var(--card-1); border: 1px solid var(--linha); border-left: 2px solid var(--acento);
+  border-radius: var(--radius); padding: 20px 22px; margin-bottom: 22px;
 }
-.nivel-badge { font-size: 0.78rem; color: var(--cinza); }
+.nivel-badge { font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.72rem; color: var(--cinza-fraco); text-transform: uppercase; letter-spacing: 0.06em; }
 .nivel-nome { font-size: 1.4rem; font-weight: 700; color: var(--acento); margin-top: 4px; }
 .nivel-desc { color: var(--cinza); font-size: 0.9rem; margin-top: 8px; }
 
@@ -92,13 +114,13 @@ main { max-width: 1680px; margin: 0 auto; padding: 10px clamp(20px, 4vw, 64px) 4
 .categoria-titulo { font-size: 0.95rem; font-weight: 700; color: var(--branco); margin-bottom: 12px; }
 
 .recomendacao-item {
-  background: var(--card-1); border: 1px solid var(--linha); border-radius: var(--radius);
-  padding: 14px 16px; margin-bottom: 10px;
+  background: var(--card-1); border: 1px solid var(--linha); border-left: 2px solid var(--acento);
+  border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
 }
 .rec-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .rec-titulo { font-weight: 500; font-size: 0.94rem; color: var(--branco); }
 .rec-tags { display: flex; gap: 10px; flex-wrap: wrap; }
-.rec-tag { font-size: 0.72rem; color: var(--cinza-fraco); white-space: nowrap; }
+.rec-tag { font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.7rem; color: var(--cinza-fraco); white-space: nowrap; text-transform: uppercase; letter-spacing: 0.04em; }
 .rec-desc { color: var(--cinza); font-size: 0.86rem; margin-top: 6px; line-height: 1.55; }
 
 /* ── SOBRE ──────────────────────────────────────────────── */
