@@ -1,415 +1,340 @@
 /* ============================================================
-   Copa do Mundo 2026 — Análise Preditiva do Brasil (Grupo C)
-   Motor: força Elo (pontos FIFA) + gols via Poisson (Dixon-Coles simplificado)
-   Dados embutidos (fallback) + overlay automático via data.json
-   HTML + CSS + JS puro · roda direto no GitHub Pages
+   NexaBoost — IA de Otimização de PC para Jogos
+   Motor: reconhecimento de padrões de hardware (GPU/CPU) +
+   base de conhecimento de recomendações, filtrada por regras.
+   HTML + CSS + JS puro · roda direto no navegador, sem servidor.
    ============================================================ */
 
-// ── CONFIG DO MODELO (idealmente calibrada contra histórico) ──
-// Os pesos abaixo seriam ajustados minimizando erro vs. resultados
-// reais (ex.: log-loss). Os valores são um ponto de partida sensato.
-const CONFIG = {
-  pesos: { elo: 0.50, h2h: 0.20, forma: 0.30 }, // soma = 1
-  h2hShrinkage: 5,   // pseudo-jogos: puxa o H2H para 0.5 quando há poucos confrontos
-  eloDivisor: 600,   // escala da expectativa Elo (padrão FIFA)
-  mediaGols: 1.30,   // gols médios por seleção/jogo (nível-base do Poisson)
-  tiltForca: 0.75,   // o quanto a força combinada desloca os λ
-  rhoDC: -0.05,      // ajuste Dixon-Coles nos placares baixos (calibrável)
-  maxGols: 8,        // truncamento da matriz de Poisson
-};
+// ── RECONHECIMENTO DE GPU (texto livre → tier 0-4) ────────────
+const GPU_TIERS = [
+  { tier: 4, re: /rtx\s?50(80|90)|rtx\s?40(80|90)|rtx\s?a?6000|titan|rx\s?79(00|50)|rx\s?9070\s?xt|radeon\s?vii/i },
+  { tier: 3, re: /rtx\s?50(60|70)|rtx\s?40(60|70)|rtx\s?30(70|80|90)|rx\s?77(00)|rx\s?68(00)|rx\s?90(60|70)|arc\s?b580/i },
+  { tier: 2, re: /rtx\s?50(50)|rtx\s?40(50)|rtx\s?30(50|60)|rtx\s?20(60|70|80)|gtx\s?16(60)|rx\s?66(00|50)|rx\s?76(00)|rx\s?58(0)?0|rx\s?57(0)?0|arc\s?a7\d\d/i },
+  { tier: 1, re: /gtx\s?10(50|60)|gtx\s?16(30|50)|rx\s?55(0)?0|rx\s?64(00|500)|mx\s?(150|250|350|450|550)|arc\s?a3\d\d/i },
+  { tier: 0, re: /uhd|iris|vega\s?\d\s?integrada|radeon\s?graphics|placa\s?integrada|sem\s?placa|nenhuma/i },
+];
 
-// ── DADOS REAIS (fallback embutido — sempre funciona offline) ─
-const BASE = {
-  // Pontos FIFA (escala tipo Elo). PLACEHOLDERS — confira/atualize com os
-  // pontos OFICIAIS atuais em https://inside.fifa.com/fifa-world-ranking
-  pontosFIFA: { BRA: 1860, MAR: 1700, SCO: 1500, HAI: 1320 },
-
-  h2h: {
-    'BRA-MAR': { jogos: 4, vBRA: 2, e: 1, vADV: 1, golsBRA: 6, golsADV: 4 },
-    'BRA-HAI': { jogos: 3, vBRA: 3, e: 0, vADV: 0, golsBRA: 17, golsADV: 1 },
-    'BRA-SCO': { jogos: 2, vBRA: 2, e: 0, vADV: 0, golsBRA: 4, golsADV: 1 },
-  },
-
-  forma: { BRA: 0.60, MAR: 0.72, SCO: 0.58, HAI: 0.40 }, // aproveitamento últimos 10
-  mediagols:    { BRA: 1.8, MAR: 1.5, SCO: 1.4, HAI: 0.9 }, // gols marcados/jogo (ataque)
-  golsSofridos: { BRA: 0.7, MAR: 0.9, SCO: 1.1, HAI: 1.6 }, // gols sofridos/jogo (defesa) — estimativa
-
-  jogos: [
-    {
-      id: 1, rodada: 'Rodada 1',
-      data: '2026-06-13T22:00:00-03:00',
-      local: 'MetLife Stadium, Nova York',
-      adversario: 'Marrocos', codAdv: 'MAR', flag: '🇲🇦',
-      resultadoReal: { golsBRA: 1, golsADV: 1, marcadores: ['Vinícius Jr (32\')', 'Saibari (21\')'] },
-      finalizado: true,
-    },
-    {
-      id: 2, rodada: 'Rodada 2',
-      data: '2026-06-19T22:00:00-03:00',
-      local: 'Lincoln Financial Field, Filadélfia',
-      adversario: 'Haiti', codAdv: 'HAI', flag: '🇭🇹',
-      resultadoReal: { golsBRA: 3, golsADV: 0 },
-      finalizado: true,
-    },
-    {
-      id: 3, rodada: 'Rodada 3',
-      data: '2026-06-24T19:00:00-03:00',
-      local: 'Hard Rock Stadium, Miami',
-      adversario: 'Escócia', codAdv: 'SCO', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-      resultadoReal: null, finalizado: false,
-    },
-  ],
-
-  grupoC: [
-    { pos: 1, cod: 'BRA', nome: 'Brasil',   flag: '🇧🇷', j:2, v:1, e:1, d:0, gp:4, gc:1, sg:3,  pts:4 },
-    { pos: 2, cod: 'SCO', nome: 'Escócia',  flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', j:1, v:1, e:0, d:0, gp:1, gc:0, sg:1,  pts:3 },
-    { pos: 3, cod: 'MAR', nome: 'Marrocos', flag: '🇲🇦', j:1, v:0, e:1, d:0, gp:1, gc:1, sg:0,  pts:1 },
-    { pos: 4, cod: 'HAI', nome: 'Haiti',    flag: '🇭🇹', j:2, v:0, e:0, d:2, gp:0, gc:4, sg:-4, pts:0 },
-  ],
-};
-
-// ── FORÇA COMBINADA: Elo + H2H (com encolhimento) + forma ─────
-function forcaCombinada(codAdv) {
-  // Expectativa Elo a partir dos pontos FIFA (ΔR/600)
-  const dR = BASE.pontosFIFA.BRA - BASE.pontosFIFA[codAdv];
-  const eElo = 1 / (1 + Math.pow(10, -dR / CONFIG.eloDivisor));
-
-  // H2H com shrinkage em direção a 0.5 (amostra pequena = pouca confiança)
-  const h = BASE.h2h[`BRA-${codAdv}`] || { jogos: 0, vBRA: 0, e: 0 };
-  const h2hRaw = h.jogos > 0 ? (h.vBRA + 0.5 * h.e) / h.jogos : 0.5;
-  const k0 = CONFIG.h2hShrinkage;
-  const h2hShrunk = (h2hRaw * h.jogos + 0.5 * k0) / (h.jogos + k0);
-
-  // Forma recente (aproveitamento relativo)
-  const forma = BASE.forma.BRA / (BASE.forma.BRA + BASE.forma[codAdv]);
-
-  const w = CONFIG.pesos;
-  const forca = w.elo * eElo + w.h2h * h2hShrunk + w.forma * forma;
-  return { forca, eElo, h2hShrunk, forma };
+function tierPorTexto(texto, tiers) {
+  const t = (texto || '').toLowerCase();
+  for (const item of tiers) if (item.re.test(t)) return item.tier;
+  return null;
 }
 
-// ── λ (GOLS ESPERADOS) via ataque/defesa + tilt da força ──────
-function calcularLambdas(codAdv, forca) {
-  const AVG = CONFIG.mediaGols;
-  const ataqueBRA = BASE.mediagols.BRA / AVG;
-  const defesaADV = BASE.golsSofridos[codAdv] / AVG;
-  const ataqueADV = BASE.mediagols[codAdv] / AVG;
-  const defesaBRA = BASE.golsSofridos.BRA / AVG;
-
-  // base Dixon-Coles multiplicativa + inclinação pela força combinada
-  let lamBRA = AVG * ataqueBRA * defesaADV * Math.pow(forca / 0.5, CONFIG.tiltForca);
-  let lamADV = AVG * ataqueADV * defesaBRA * Math.pow((1 - forca) / 0.5, CONFIG.tiltForca);
-
-  lamBRA = Math.min(6, Math.max(0.15, lamBRA));
-  lamADV = Math.min(6, Math.max(0.15, lamADV));
-  return { lamBRA, lamADV };
+function tierGPU(texto) {
+  const direto = tierPorTexto(texto, GPU_TIERS);
+  if (direto !== null) return direto;
+  const t = (texto || '').toLowerCase();
+  if (!t.trim()) return null;
+  if (t.includes('rtx')) return 2;
+  if (t.includes('gtx')) return 1;
+  if (t.includes('radeon') || t.includes('rx')) return 2;
+  if (t.includes('intel')) return 0;
+  return null; // não reconhecido
 }
 
-// ── POISSON + MATRIZ DE PLACARES ──────────────────────────────
-function fatorial(n) { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; }
-function poisson(k, lambda) { return Math.exp(-lambda) * Math.pow(lambda, k) / fatorial(k); }
+// ── RECONHECIMENTO DE CPU (texto livre → tier 0-4) ────────────
+const CPU_TIERS = [
+  { tier: 4, re: /i9|ryzen\s?9|threadripper|xeon\s?w/i },
+  { tier: 3, re: /i7|ryzen\s?7/i },
+  { tier: 2, re: /i5|ryzen\s?5/i },
+  { tier: 1, re: /i3|ryzen\s?3|celeron|pentium|athlon/i },
+];
 
-// Correção Dixon-Coles para placares baixos (rho calibrável)
-function tauDC(i, j, lamA, lamB, rho) {
-  if (i === 0 && j === 0) return 1 - lamA * lamB * rho;
-  if (i === 0 && j === 1) return 1 + lamA * rho;
-  if (i === 1 && j === 0) return 1 + lamB * rho;
-  if (i === 1 && j === 1) return 1 - rho;
-  return 1;
-}
-
-function matrizPlacares(lamBRA, lamADV) {
-  const N = CONFIG.maxGols, m = [];
-  let soma = 0;
-  for (let i = 0; i <= N; i++) {
-    m[i] = [];
-    for (let j = 0; j <= N; j++) {
-      let p = poisson(i, lamBRA) * poisson(j, lamADV) * tauDC(i, j, lamBRA, lamADV, CONFIG.rhoDC);
-      if (p < 0) p = 0;
-      m[i][j] = p; soma += p;
-    }
+function tierCPU(texto, nucleos) {
+  const direto = tierPorTexto(texto, CPU_TIERS);
+  if (direto !== null) return direto;
+  if (nucleos) {
+    if (nucleos <= 4) return 1;
+    if (nucleos <= 6) return 2;
+    if (nucleos <= 8) return 3;
+    return 4;
   }
-  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) m[i][j] /= soma; // normaliza
-  return m;
+  return 2; // desconhecido → assume médio, neutro
 }
 
-// Vitória/empate/derrota, placar mais provável e top placares — TUDO da matriz
-function derivarDaMatriz(m) {
-  let pVitBRA = 0, pEmpate = 0, pVitADV = 0, best = { p: -1, i: 0, j: 0 };
-  const cels = [];
-  for (let i = 0; i < m.length; i++) for (let j = 0; j < m[i].length; j++) {
-    const p = m[i][j];
-    if (i > j) pVitBRA += p; else if (i === j) pEmpate += p; else pVitADV += p;
-    if (p > best.p) best = { p, i, j };
-    cels.push({ i, j, p });
-  }
-  cels.sort((a, b) => b.p - a.p);
-  return { pVitBRA, pEmpate, pVitADV, placar: best, top: cels.slice(0, 5) };
+const RAM_TIER = { '4': 0, '8': 1, '16': 2, '32': 3, '64': 4 };
+
+// ── DETECÇÃO DO TIPO DE JOGO (texto livre) ────────────────────
+const JOGOS_ONLINE = ['valorant', 'counter-strike', 'counter strike', 'cs2', 'csgo', 'cs:go',
+  'league of legends', ' lol', 'fortnite', 'apex', 'free fire', 'freefire', 'call of duty',
+  'warzone', 'overwatch', 'rainbow six', ' r6', 'rocket league', 'dota'];
+const JOGOS_GRAFICOS = ['cyberpunk', 'gta', 'grand theft auto', 'red dead', 'rdr2', 'elden ring',
+  'hogwarts', 'alan wake', 'horizon', 'god of war', 'far cry', "assassin's creed", 'assassins creed',
+  'witcher', 'starfield', 'black myth'];
+
+function tipoDeJogo(texto) {
+  if (!texto || !texto.trim()) return null;
+  const t = ' ' + texto.toLowerCase() + ' ';
+  if (JOGOS_ONLINE.some(k => t.includes(k))) return 'online';
+  if (JOGOS_GRAFICOS.some(k => t.includes(k))) return 'grafico';
+  return 'generico';
 }
 
-// ── ANÁLISE COMPLETA DE UM CONFRONTO ──────────────────────────
-function calcularProbabilidades(codAdv) {
-  const f = forcaCombinada(codAdv);
-  const { lamBRA, lamADV } = calcularLambdas(codAdv, f.forca);
-  const m = matrizPlacares(lamBRA, lamADV);
-  const r = derivarDaMatriz(m);
-
-  const h = BASE.h2h[`BRA-${codAdv}`] || { jogos: 0 };
-  const confianca = h.jogos >= 5 ? 5 : h.jogos >= 3 ? 4 : h.jogos >= 1 ? 3 : 2;
-
-  const topMax = r.top[0].p || 1;
-  return {
-    pVitBRA: Math.round(r.pVitBRA * 100),
-    pEmpate: Math.round(r.pEmpate * 100),
-    pVitADV: Math.round(r.pVitADV * 100),
-    placarBRA: r.placar.i,
-    placarADV: r.placar.j,
-    lamBRA: +lamBRA.toFixed(2),
-    lamADV: +lamADV.toFixed(2),
-    eElo: Math.round(f.eElo * 100),
-    confianca,
-    top: r.top.map(c => ({ s: `${c.i}×${c.j}`, pct: Math.round(c.p * 100), rel: Math.round((c.p / topMax) * 100) })),
-  };
+// ── NÍVEL DA MÁQUINA ──────────────────────────────────────────
+function calcularNivel(gpuTier, cpuTier, ramTier) {
+  const score = gpuTier * 0.45 + cpuTier * 0.30 + ramTier * 0.25;
+  if (score < 1) return { nome: 'Entrada', score, desc: 'Sua máquina roda jogos, mas precisa de ajustes finos pra ficar fluida. O plano abaixo prioriza o que traz mais FPS de graça.' };
+  if (score < 2) return { nome: 'Intermediário', score, desc: 'PC equilibrado — dá pra jogar bem a maioria dos títulos com alguns ajustes de configuração.' };
+  if (score < 3) return { nome: 'Alto desempenho', score, desc: 'Máquina forte. O foco aqui é eliminar gargalos escondidos e liberar todo o potencial que ela já tem.' };
+  return { nome: 'Enthusiast', score, desc: 'PC de ponta. As dicas abaixo são mais sobre refinamento (latência, qualidade visual) do que sobre ganhar FPS.' };
 }
 
-// ── VALIDAÇÃO RETROATIVA ─────────────────────────────────────
-// Vencedor previsto = PROBABILIDADE DOMINANTE (não o placar projetado).
-// Placar (±1 gol) é só critério extra para "acerto cheio".
-function validarJogo(analise, resultado) {
-  if (!resultado) return null;
-  const { golsBRA, golsADV } = resultado;
-  const { pVitBRA, pEmpate, pVitADV, placarBRA, placarADV } = analise;
+// ── BASE DE CONHECIMENTO (regras de recomendação) ─────────────
+// condicao(s) recebe o objeto de specs processado e devolve true/false.
+const BASE_CONHECIMENTO = [
+  // Windows & energia
+  { categoria: 'Windows & energia', icone: '⚙️', dificuldade: 'fácil', impacto: 'alto',
+    titulo: 'Ativar o plano de energia "Alto desempenho"',
+    desc: 'Em Configurações > Sistema > Energia, troque o plano de energia para "Alto desempenho" ou "Melhor desempenho". Em notebooks, mantenha na tomada ao jogar.',
+    condicao: () => true },
+  { categoria: 'Windows & energia', icone: '⚙️', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Ativar o Modo de Jogo do Windows',
+    desc: 'Em Configurações > Jogos > Modo de Jogo, ative a opção. Isso evita que o Windows Update e notificações atrapalhem o desempenho durante a partida.',
+    condicao: () => true },
+  { categoria: 'Windows & energia', icone: '⚙️', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Reduzir efeitos visuais do Windows',
+    desc: 'Em "Ajustar a aparência e o desempenho do Windows" (pesquise no menu Iniciar), marque "Ajustar para obter um melhor desempenho". Libera RAM e processamento de vídeo.',
+    condicao: s => s.gpuTier <= 1 || s.ramTier <= 1 },
+  { categoria: 'Windows & energia', icone: '⚙️', dificuldade: 'médio', impacto: 'médio',
+    titulo: 'Ativar "GPU agendada por hardware"',
+    desc: 'Em Configurações > Sistema > Tela > Gráficos, ative essa opção. Reduz a latência entre CPU e GPU em placas mais recentes.',
+    condicao: s => s.gpuTier >= 1 },
+  { categoria: 'Windows & energia', icone: '⚙️', dificuldade: 'fácil', impacto: 'baixo',
+    titulo: 'Manter o Windows e o BIOS/chipset atualizados',
+    desc: 'Atualizações do sistema costumam trazer correções de desempenho e compatibilidade que passam despercebidas.',
+    condicao: () => true },
 
-  let previsto = 'empate';
-  if (pVitBRA >= pEmpate && pVitBRA >= pVitADV) previsto = 'brasil';
-  else if (pVitADV >= pEmpate && pVitADV >= pVitBRA) previsto = 'adversario';
+  // Drivers e software
+  { categoria: 'Drivers e software', icone: '🧩', dificuldade: 'fácil', impacto: 'alto',
+    titulo: 'Atualizar o driver da placa de vídeo',
+    desc: 'Baixe direto do site do fabricante (NVIDIA, AMD ou Intel) — não confie só no Windows Update. Drivers novos costumam trazer ganhos de FPS específicos por jogo.',
+    condicao: () => true },
+  { categoria: 'Drivers e software', icone: '🧩', dificuldade: 'médio', impacto: 'médio',
+    titulo: 'Instalar DirectX e Visual C++ Redistributables atualizados',
+    desc: 'Muitos travamentos e erros de inicialização em jogos vêm de bibliotecas desatualizadas. O "DirectX End-User Runtime" resolve boa parte deles.',
+    condicao: () => true },
+  { categoria: 'Drivers e software', icone: '🧩', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Fechar overlays desnecessários durante o jogo',
+    desc: 'Discord, GeForce Experience, Xbox Game Bar e afins consomem GPU/CPU em segundo plano só para desenhar o overlay. Desative os que você não usa.',
+    condicao: () => true },
+  { categoria: 'Drivers e software', icone: '🧩', dificuldade: 'médio', impacto: 'baixo',
+    titulo: 'Configurar exceção do antivírus para a pasta do jogo',
+    desc: 'Antivírus de terceiros que escaneiam arquivos em tempo real podem causar engasgos ao carregar texturas. Adicione a pasta do jogo como exceção (mantenha a proteção geral ativa).',
+    condicao: s => s.cpuTier <= 1 },
 
-  const real = golsBRA > golsADV ? 'brasil' : golsADV > golsBRA ? 'adversario' : 'empate';
-  const acertouVencedor = previsto === real;
-  const placarProximo = Math.abs(placarBRA - golsBRA) <= 1 && Math.abs(placarADV - golsADV) <= 1;
+  // Processos em segundo plano
+  { categoria: 'Processos em segundo plano', icone: '🧵', dificuldade: 'fácil', impacto: 'alto',
+    titulo: 'Desativar programas de inicialização desnecessários',
+    desc: 'Abra o Gerenciador de Tarefas (Ctrl+Shift+Esc) > aba Inicialização, e desative tudo que não precisa abrir junto com o Windows. Menos processos disputando RAM e CPU.',
+    condicao: s => s.ramTier <= 1 || s.cpuTier <= 1 },
+  { categoria: 'Processos em segundo plano', icone: '🧵', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Fechar navegador e outros apps pesados antes de jogar',
+    desc: 'Um navegador com muitas abas abertas pode consumir vários GB de RAM sozinho — isso rouba memória que o jogo poderia usar.',
+    condicao: s => s.ramTier <= 2 },
+  { categoria: 'Processos em segundo plano', icone: '🧵', dificuldade: 'fácil', impacto: 'alto',
+    titulo: 'Pausar downloads e atualizações em segundo plano',
+    desc: 'Steam, Windows Update, OneDrive e afins competindo por disco e rede causam engasgos (stutter) mesmo em PCs fortes. Pause tudo antes de jogar.',
+    condicao: () => true },
+  { categoria: 'Processos em segundo plano', icone: '🧵', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Desativar apps de gravação/streaming quando não estiver usando',
+    desc: 'OBS, ShadowPlay e overlays de gravação ficam consumindo GPU mesmo parados, se abertos em segundo plano.',
+    condicao: () => true },
 
-  let tipo, label;
-  if (acertouVencedor && placarProximo) { tipo = 'acerto'; label = '✅ Acerto'; }
-  else if (acertouVencedor) { tipo = 'parcial'; label = '⚠️ Parcial'; }
-  else { tipo = 'erro'; label = '❌ Erro'; }
+  // Armazenamento
+  { categoria: 'Armazenamento', icone: '💾', dificuldade: 'avançado', impacto: 'alto',
+    titulo: 'Mover o jogo para um SSD',
+    desc: 'Jogos em HD tradicional (HDD) sofrem com carregamentos longos e engasgos ao carregar novas áreas do mapa. Se puder, mova (ou reinstale) o jogo num SSD — a diferença é enorme.',
+    condicao: s => s.storage === 'hdd' },
+  { categoria: 'Armazenamento', icone: '💾', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Manter pelo menos 15-20% de espaço livre em disco',
+    desc: 'Discos quase cheios (especialmente SSDs) ficam mais lentos para gravar arquivos temporários e podem causar engasgos.',
+    condicao: () => true },
+  { categoria: 'Armazenamento', icone: '💾', dificuldade: 'avançado', impacto: 'baixo',
+    titulo: 'Confirmar que o TRIM está ativo no SSD',
+    desc: 'Abra o Prompt de Comando como administrador e rode: fsutil behavior query DisableDeleteNotify — se o resultado for 0, o TRIM já está ativo (bom sinal).',
+    condicao: s => s.storage === 'ssd' || s.storage === 'nvme' },
+  { categoria: 'Armazenamento', icone: '💾', dificuldade: 'médio', impacto: 'médio',
+    titulo: 'Desfragmentar o HD tradicional periodicamente',
+    desc: 'Se o jogo está no HDD, desfragmentar de vez em quando ajuda a reduzir os tempos de carregamento. Atenção: nunca desfragmente um SSD/NVMe, isso só desgasta ele à toa.',
+    condicao: s => s.storage === 'hdd' },
 
-  return {
-    tipo, label, acertouVencedor,
-    detalhe: `Projeção ${placarBRA}×${placarADV} · Resultado ${golsBRA}×${golsADV}`,
-  };
+  // Configurações gráficas do jogo
+  { categoria: 'Configurações gráficas do jogo', icone: '🎮', dificuldade: 'fácil', impacto: 'alto',
+    titulo: 'Baixar texturas, sombras e reflexos para Baixo/Médio',
+    desc: 'Nessas configurações, sombras dinâmicas e reflexos em tempo real custam muito FPS pra pouco ganho visual perceptível durante o jogo.',
+    condicao: s => s.gpuTier <= 1 },
+  { categoria: 'Configurações gráficas do jogo', icone: '🎮', dificuldade: 'fácil', impacto: 'alto',
+    titulo: 'Desligar Ray Tracing',
+    desc: 'Ray Tracing custa muito desempenho para a sua GPU atual. Deixe desligado a menos que o objetivo seja só apreciar os gráficos parado.',
+    condicao: s => s.gpuTier <= 2 && s.objetivo !== 'grafico' },
+  { categoria: 'Configurações gráficas do jogo', icone: '🎮', dificuldade: 'fácil', impacto: 'alto',
+    titulo: 'Ativar upscaling (DLSS, FSR ou XeSS) no modo Desempenho',
+    desc: 'Se o jogo suportar, o upscaling gera a imagem numa resolução menor e usa IA para reconstruir os detalhes — ganho grande de FPS com perda visual pequena.',
+    condicao: s => s.gpuTier <= 2 },
+  { categoria: 'Configurações gráficas do jogo', icone: '🎮', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Texturas em Alto, o resto em Médio',
+    desc: 'Texturas consomem principalmente memória de vídeo (VRAM), não poder de processamento — geralmente dá pra deixar em Alto sem perder muito FPS, mesmo numa GPU intermediária.',
+    condicao: s => s.gpuTier === 2 || s.gpuTier === 3 },
+  { categoria: 'Configurações gráficas do jogo', icone: '🎮', dificuldade: 'fácil', impacto: 'baixo',
+    titulo: 'Pode ativar Ray Tracing e Ultra em quase tudo',
+    desc: 'Sua GPU aguenta os efeitos mais pesados. Se o objetivo é FPS máximo em competitivo, ainda vale considerar baixar sombras — o resto pode ficar no talo.',
+    condicao: s => s.gpuTier >= 3 },
+  { categoria: 'Configurações gráficas do jogo', icone: '🎮', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Desligar V-Sync e usar um limitador de FPS',
+    desc: 'V-Sync tradicional adiciona latência (input lag). Prefira limitar o FPS um pouco abaixo da taxa de atualização do monitor (nas configurações do jogo ou no painel da GPU).',
+    condicao: s => s.objetivo === 'fps' },
+  { categoria: 'Configurações gráficas do jogo', icone: '🎮', dificuldade: 'fácil', impacto: 'baixo',
+    titulo: 'Desligar motion blur, depth of field e film grain',
+    desc: 'Esses efeitos consomem desempenho e, para quem busca reação rápida, atrapalham mais do que ajudam.',
+    condicao: s => s.objetivo === 'fps' },
+  { categoria: 'Configurações gráficas do jogo', icone: '🎮', dificuldade: 'médio', impacto: 'alto',
+    titulo: 'Priorize Iluminação e Texturas sobre Sombra e Densidade de multidão/vegetação',
+    desc: 'Em jogos mundo-aberto pesados, sombra e densidade de população/vegetação costumam custar muito FPS para um ganho visual pequeno comparado à iluminação e às texturas.',
+    condicao: s => s.jogoTipo === 'grafico' },
+
+  // Rede
+  { categoria: 'Rede', icone: '🌐', dificuldade: 'fácil', impacto: 'alto',
+    titulo: 'Preferir cabo de rede (Ethernet) em vez de Wi-Fi',
+    desc: 'Cabo de rede reduz latência e variações de ping (jitter), que em jogos competitivos importam mais do que a velocidade da internet em si.',
+    condicao: s => s.jogoTipo === 'online' },
+  { categoria: 'Rede', icone: '🌐', dificuldade: 'fácil', impacto: 'médio',
+    titulo: 'Pausar downloads em outros dispositivos da rede durante as partidas',
+    desc: 'Um celular ou outro PC baixando algo pesado na mesma rede pode causar picos de ping mesmo com boa internet.',
+    condicao: s => s.jogoTipo === 'online' },
+  { categoria: 'Rede', icone: '🌐', dificuldade: 'médio', impacto: 'médio',
+    titulo: 'Adicionar o jogo como exceção no firewall/antivírus',
+    desc: 'Isso evita que o software de segurança inspecione cada pacote de rede do jogo, o que pode causar picos de ping (spikes).',
+    condicao: s => s.jogoTipo === 'online' },
+  { categoria: 'Rede', icone: '🌐', dificuldade: 'fácil', impacto: 'baixo',
+    titulo: 'Reiniciar o roteador antes de sessões longas',
+    desc: 'Roteadores acumulam instabilidade com o tempo ligado. Um reinício simples resolve boa parte dos picos de ping esporádicos.',
+    condicao: s => s.jogoTipo === 'online' },
+];
+
+const ORDEM_CATEGORIAS = ['Windows & energia', 'Drivers e software', 'Processos em segundo plano',
+  'Armazenamento', 'Configurações gráficas do jogo', 'Rede'];
+
+function gerarPlano(specs) {
+  const itens = BASE_CONHECIMENTO.filter(item => item.condicao(specs));
+  const categorias = ORDEM_CATEGORIAS
+    .map(nome => ({ nome, itens: itens.filter(i => i.categoria === nome) }))
+    .filter(cat => cat.itens.length > 0);
+  return { nivel: calcularNivel(specs.gpuTier, specs.cpuTier, specs.ramTier), categorias };
 }
 
-// ── UTILS ────────────────────────────────────────────────────
-function countdown(dataStr) {
-  const diff = new Date(dataStr).getTime() - Date.now();
-  if (diff <= 0) return null;
-  const d = Math.floor(diff / 86400000);
-  const h = Math.floor((diff % 86400000) / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  const s = Math.floor((diff % 60000) / 1000);
-  return `${d}d ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
-}
-const estrelas = n => '★'.repeat(n) + '☆'.repeat(5 - n);
-
-// ── TABELA ───────────────────────────────────────────────────
-function renderTabela(dados) {
-  document.getElementById('grupo-body').innerHTML = dados.map((t, i) => `
-    <tr class="${t.cod === 'BRA' ? 'row-brasil' : ''}">
-      <td>${i + 1}</td>
-      <td>${t.flag} ${t.nome}</td>
-      <td>${t.j}</td><td>${t.v}</td><td>${t.e}</td><td>${t.d}</td>
-      <td>${t.gp}</td><td>${t.gc}</td>
-      <td>${t.sg >= 0 ? '+' : ''}${t.sg}</td>
-      <td class="pts-cell">${t.pts}</td>
-    </tr>`).join('');
-}
-
-// ── CARDS DE JOGOS ───────────────────────────────────────────
-function renderJogos(jogos) {
-  let acertos = 0, total = 0;
-
-  document.getElementById('jogos-grid').innerHTML = jogos.map(jogo => {
-    const a = calcularProbabilidades(jogo.codAdv);
-    let validacao = null;
-
-    const dataJogo = new Date(jogo.data).getTime();
-    const jogoPassado = Date.now() > dataJogo + 120 * 60 * 1000;
-
-    if ((jogo.finalizado || jogoPassado) && jogo.resultadoReal) {
-      jogo.finalizado = true;
-      validacao = validarJogo(a, jogo.resultadoReal);
-      total++;
-      if (validacao.acertouVencedor) acertos++;
-    }
-
-    let statusHtml;
-    if (jogo.finalizado && jogo.resultadoReal) statusHtml = `<span class="jogo-status status-finalizado">Finalizado</span>`;
-    else if (jogoPassado && !jogo.resultadoReal) statusHtml = `<span class="jogo-status status-finalizado">Aguardando resultado</span>`;
-    else if (Date.now() > dataJogo - 30 * 60 * 1000) statusHtml = `<span class="jogo-status status-ao-vivo">🔴 Ao vivo</span>`;
-    else statusHtml = `<span class="jogo-status status-futuro">Próximo jogo</span>`;
-
-    let placarHtml;
-    if (jogo.finalizado && jogo.resultadoReal) {
-      placarHtml = `<div class="placar-real">${jogo.resultadoReal.golsBRA} – ${jogo.resultadoReal.golsADV}</div>`;
-    } else {
-      placarHtml = `
-        <div class="placar-vs">VS</div>
-        <div class="placar-previsto-label">Mais provável</div>
-        <div class="placar-previsto-val">${a.placarBRA} – ${a.placarADV}</div>`;
-    }
-
-    const ct = countdown(jogo.data);
-    const countdownHtml = (!jogo.finalizado && ct) ? `
-      <div class="countdown-box">
-        <div class="countdown-label">Faltam</div>
-        <div class="countdown-timer" id="ct-${jogo.id}">${ct}</div>
-      </div>` : '';
-
-    const validacaoHtml = validacao ? `
-      <div class="validacao-row">
-        <span class="validacao-badge badge-${validacao.tipo}">${validacao.label}</span>
-        <span class="validacao-detalhe">${validacao.detalhe}</span>
-      </div>` : '';
-
-    const marcadoresHtml = jogo.resultadoReal?.marcadores ? `
-      <div class="info-row" style="margin-top:10px">
-        ${jogo.resultadoReal.marcadores.map(m => `<span class="info-chip">⚽ ${m}</span>`).join('')}
-      </div>` : '';
-
-    // Top placares mais prováveis (da matriz de Poisson)
-    const placaresHtml = `
-      <div class="placares">
-        <div class="placares-titulo">Placares mais prováveis</div>
-        ${a.top.map(t => `
-          <div class="pl-row">
-            <span class="pl-score">${t.s}</span>
-            <span class="pl-bar"><i style="width:${Math.max(6, t.rel)}%"></i></span>
-            <span class="pl-pct">${t.pct}%</span>
-          </div>`).join('')}
-      </div>`;
-
-    const dataFmt = new Date(jogo.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-
-    return `
-      <div class="jogo-card">
-        <div class="jogo-card-header">
-          <span class="jogo-rodada">${jogo.rodada}</span>
-          <span class="jogo-data">${dataFmt} · ${jogo.local.split(',')[1]?.trim() || jogo.local}</span>
-          ${statusHtml}
-        </div>
-        <div class="jogo-card-body">
-          <div class="confronto">
-            <div class="time"><div class="time-bandeira">🇧🇷</div><div class="time-nome brasil">Brasil</div></div>
-            <div class="placar-box">${placarHtml}</div>
-            <div class="time"><div class="time-bandeira">${jogo.flag}</div><div class="time-nome">${jogo.adversario}</div></div>
-          </div>
-          ${marcadoresHtml}
-          <div class="prob-section">
-            <div class="prob-label-row"><span>Brasil</span><span>Empate</span><span>${jogo.adversario}</span></div>
-            <div class="prob-bar-wrap">
-              <div class="prob-bar-brasil" style="width:0%" data-target="${a.pVitBRA}%"></div>
-              <div class="prob-bar-empate" style="width:0%" data-target="${a.pEmpate}%"></div>
-              <div class="prob-bar-adversario" style="width:0%" data-target="${a.pVitADV}%"></div>
-            </div>
-            <div class="prob-pct-row">
-              <span class="pct-brasil">${a.pVitBRA}%</span>
-              <span class="pct-empate">${a.pEmpate}%</span>
-              <span class="pct-adversario">${a.pVitADV}%</span>
-            </div>
-          </div>
-          ${placaresHtml}
-          <div class="info-row">
-            <span class="info-chip">λ Brasil: ${a.lamBRA}</span>
-            <span class="info-chip">λ ${jogo.adversario}: ${a.lamADV}</span>
-            <span class="info-chip">Base Elo: ${a.eElo}%</span>
-            <span class="info-chip">FIFA: ${BASE.pontosFIFA.BRA} vs ${BASE.pontosFIFA[jogo.codAdv]} pts</span>
-          </div>
-          <div class="confianca-row"><span>Confiança da projeção:</span><span class="estrelas">${estrelas(a.confianca)}</span></div>
-          <p class="analise-texto">${gerarTexto(jogo, a)}</p>
-          <p class="modelo-nota">Modelo: força Elo (pontos FIFA) + gols via Poisson (Dixon-Coles simplificado).</p>
-          ${countdownHtml}
-          ${validacaoHtml}
-        </div>
-      </div>`;
-  }).join('');
-
-  setTimeout(() => document.querySelectorAll('[data-target]').forEach(el => el.style.width = el.dataset.target), 100);
-
-  const det = document.getElementById('assert-detalhe');
-  if (total > 0) {
-    document.getElementById('assert-val').textContent = Math.round((acertos / total) * 100) + '%';
-    det.textContent = `${acertos} de ${total} ${total === 1 ? 'jogo' : 'jogos'} no vencedor`;
-  } else {
-    document.getElementById('assert-val').textContent = '—';
-    det.textContent = 'Aguardando o 1º jogo';
-  }
-
-  clearInterval(window.__ctTimer);
-  window.__ctTimer = setInterval(() => {
-    jogos.forEach(jogo => {
-      const el = document.getElementById(`ct-${jogo.id}`);
-      if (!el) return;
-      const ct = countdown(jogo.data);
-      if (ct) el.textContent = ct; else el.closest('.countdown-box')?.remove();
-    });
-  }, 1000);
-}
-
-// ── TEXTOS ───────────────────────────────────────────────────
-function gerarTexto(jogo, a) {
-  const { codAdv, adversario, finalizado, resultadoReal } = jogo;
-  if (finalizado && resultadoReal) {
-    const { golsBRA, golsADV } = resultadoReal;
-    if (golsBRA === golsADV) return `O empate ficou dentro do leque de placares prováveis. O ${adversario} tem qualidade para incomodar, e confirmou isso em campo.`;
-    if (golsBRA > golsADV) return `Vitória dentro do esperado. O Brasil confirmou o favoritismo que os números apontavam e seguiu firme rumo à classificação.`;
-    return `Resultado fora da curva — a tendência apontava o Brasil como favorito. Futebol tem margem de surpresa, e esse jogo caiu nela.`;
-  }
-  const textos = {
-    HAI: `O retrospecto é direto e a diferença de nível também: o modelo concentra a maior parte da probabilidade numa vitória brasileira por dois ou três gols.`,
-    SCO: `A Escócia chega organizada e embalada, mas os pontos FIFA e o histórico pendem para o Brasil. Os números apontam vantagem brasileira num jogo que pode decidir o grupo.`,
-    MAR: `Marrocos foi semifinalista em 2022 e é forte. A força combinada dá leve favoritismo ao Brasil, mas o empate aparece com peso real na distribuição de placares.`,
-  };
-  return textos[codAdv] || `A tendência aponta ${a.pVitBRA > a.pVitADV ? 'favoritismo brasileiro' : 'um duelo equilibrado'}.`;
-}
-
-// ── OVERLAY AUTOMÁTICO via data.json ─────────────────────────
-async function aplicarDataJson() {
+// ── DETECÇÃO AUTOMÁTICA (aproximada, via APIs do navegador) ──
+function detectarGPU() {
   try {
-    const res = await fetch('./data.json?ts=' + Date.now(), { cache: 'no-store', signal: AbortSignal.timeout(6000) });
-    if (!res.ok) return false;
-    const data = await res.json();
-    let mudou = false;
-    if (data.resultados) {
-      BASE.jogos.forEach(j => {
-        const r = data.resultados[j.id] || data.resultados[String(j.id)];
-        if (r && typeof r.golsBRA === 'number' && typeof r.golsADV === 'number') {
-          j.resultadoReal = r; j.finalizado = true; mudou = true;
-        }
-      });
-    }
-    if (Array.isArray(data.grupoC) && data.grupoC.length) { BASE.grupoC = data.grupoC; mudou = true; }
-    return mudou;
-  } catch { return false; }
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return null;
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    if (!ext) return null;
+    return gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || null;
+  } catch { return null; }
 }
 
-function renderTudo() {
-  const grupo = [...BASE.grupoC].sort((x, y) => y.pts - x.pts || y.sg - x.sg || y.gp - x.gp);
-  renderTabela(grupo);
-  renderJogos(BASE.jogos);
+function detectarSpecs() {
+  const nucleos = navigator.hardwareConcurrency || null;
+  const ramAprox = navigator.deviceMemory || null; // GB, limitado/aproximado pelo navegador
+  const gpuBruta = detectarGPU();
+
+  const notas = [];
+
+  if (gpuBruta) {
+    document.getElementById('gpu').value = gpuBruta;
+    notas.push(`GPU detectada: "${gpuBruta}"`);
+  } else {
+    notas.push('Não foi possível detectar a GPU automaticamente — informe manualmente.');
+  }
+
+  if (nucleos) {
+    const cpuAtual = document.getElementById('cpu').value;
+    if (!cpuAtual) document.getElementById('cpu').value = `(${nucleos} núcleos lógicos detectados — digite o modelo se souber)`;
+    notas.push(`${nucleos} núcleos lógicos de CPU detectados.`);
+  }
+
+  if (ramAprox) {
+    const ramSelect = document.getElementById('ram');
+    const opcoes = Object.keys(RAM_TIER).map(Number).sort((a, b) => a - b);
+    const aproxEscolhido = opcoes.find(o => o >= ramAprox) || opcoes[opcoes.length - 1];
+    ramSelect.value = String(aproxEscolhido);
+    notas.push(`RAM aproximada: ${ramAprox} GB (navegadores limitam essa informação por privacidade — confira e corrija se souber o valor real).`);
+  } else {
+    notas.push('Não foi possível detectar a RAM automaticamente — selecione manualmente.');
+  }
+
+  document.getElementById('sistema').value = 'win11';
+  notas.push('Sistema operacional: assumimos Windows 11 — ajuste se for diferente.');
+
+  document.getElementById('deteccao-nota').textContent = notas.join(' ');
 }
 
-// ── INIT ─────────────────────────────────────────────────────
-async function init() {
-  const status = document.getElementById('status-text');
-  status.textContent = 'Processando análise…';
+// ── RENDER DO RESULTADO ────────────────────────────────────────
+function renderResultado(plano) {
+  const { nivel, categorias } = plano;
 
-  renderTudo(); // render imediato com os dados embutidos (não trava na rede)
-  document.getElementById('ultima-atualizacao').textContent =
-    'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  status.textContent = 'Análise carregada · modelo Elo + Poisson';
+  const nivelHtml = `
+    <div class="nivel-card">
+      <div class="nivel-badge">Nível da sua máquina</div>
+      <div class="nivel-nome">${nivel.nome}</div>
+      <p class="nivel-desc">${nivel.desc}</p>
+    </div>`;
 
-  const mudou = await aplicarDataJson(); // em segundo plano
-  if (mudou) { renderTudo(); status.textContent = 'Dados atualizados automaticamente'; }
+  const categoriasHtml = categorias.map(cat => `
+    <div class="categoria-grupo">
+      <div class="categoria-titulo"><span class="cat-icone">${cat.itens[0].icone}</span>${cat.nome}</div>
+      ${cat.itens.map(item => `
+        <div class="recomendacao-item">
+          <div class="rec-topo">
+            <span class="rec-titulo">${item.titulo}</span>
+            <span class="rec-tags">
+              <span class="rec-tag tag-impacto-${item.impacto === 'alto' ? 'alto' : item.impacto === 'médio' ? 'medio' : 'baixo'}">Impacto ${item.impacto}</span>
+              <span class="rec-tag tag-${item.dificuldade === 'fácil' ? 'facil' : item.dificuldade === 'médio' ? 'medio' : 'avancado'}">${item.dificuldade}</span>
+            </span>
+          </div>
+          <p class="rec-desc">${item.desc}</p>
+        </div>`).join('')}
+    </div>`).join('');
+
+  document.getElementById('resultado-conteudo').innerHTML = nivelHtml + categoriasHtml;
+  document.getElementById('resultado-section').hidden = false;
+  document.getElementById('resultado-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── FORMULÁRIO ─────────────────────────────────────────────────
+function lerSpecsDoFormulario() {
+  const gpuTexto = document.getElementById('gpu').value;
+  const cpuTexto = document.getElementById('cpu').value;
+  const ramValor = document.getElementById('ram').value;
+  const storage = document.getElementById('storage').value || 'desconhecido';
+  const sistema = document.getElementById('sistema').value || 'outro';
+  const jogoTexto = document.getElementById('jogo').value;
+  const objetivo = document.querySelector('input[name="objetivo"]:checked')?.value || 'equilibrado';
+
+  const nucleosDetectados = navigator.hardwareConcurrency || null;
+
+  return {
+    gpuTier: tierGPU(gpuTexto) ?? 1,
+    cpuTier: tierCPU(cpuTexto, nucleosDetectados),
+    ramTier: RAM_TIER[ramValor] ?? 1,
+    storage,
+    sistema,
+    objetivo,
+    jogoTipo: tipoDeJogo(jogoTexto),
+    jogoTexto,
+  };
+}
+
+function init() {
+  document.getElementById('btn-detectar').addEventListener('click', detectarSpecs);
+
+  document.getElementById('specs-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const specs = lerSpecsDoFormulario();
+    const plano = gerarPlano(specs);
+    renderResultado(plano);
+  });
 }
 
 if (document.readyState === 'loading') {

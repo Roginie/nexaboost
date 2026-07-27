@@ -3,96 +3,148 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Brasil na Copa do Mundo 2026 — Análise Preditiva</title>
-  <meta name="description" content="Análise preditiva dos jogos do Brasil no Grupo C da Copa do Mundo 2026: modelo Elo + Poisson, probabilidades, placares prováveis e validação contra os resultados reais." />
+  <title>NexaBoost — IA de Otimização de PC para Jogos</title>
+  <meta name="description" content="NexaBoost: descubra o nível do seu PC e receba um plano de otimização gratuito e personalizado para jogar melhor, com mais FPS e menos travamentos." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=1" />
 </head>
 <body>
   <header class="hero">
     <div class="hero-inner">
-      <p class="kicker">Copa do Mundo 2026 · Grupo C</p>
-      <h1>A jornada do <span>Brasil</span></h1>
-      <p class="lead">Projeções jogo a jogo com um modelo de <strong>força Elo + Poisson</strong> — e a checagem honesta de cada palpite contra o que aconteceu em campo.</p>
+      <p class="logo-wordmark">⚡ NexaBoost</p>
+      <p class="kicker">Otimização de PC · Gratuito</p>
+      <h1>Sua <span>IA</span> de otimização pra jogar melhor</h1>
+      <p class="lead">Conte as specs do seu PC (ou deixe a gente detectar) e o jogo que você quer rodar melhor. A IA monta um <strong>plano de otimização sob medida</strong> — mais FPS, menos travamento, tudo de graça.</p>
       <div class="meta-bar">
-        <span id="status-text" class="status-pill">Carregando…</span>
-        <span id="ultima-atualizacao" class="update-pill"></span>
+        <span class="status-pill">100% gratuito</span>
+        <span class="status-pill">Roda no navegador</span>
+        <span class="status-pill">Sem instalar nada</span>
       </div>
     </div>
-    <aside class="assert-card" aria-label="Índice de assertividade do modelo">
-      <div class="assert-num" id="assert-val">—</div>
-      <div class="assert-label">Assertividade no vencedor</div>
-      <div class="assert-detalhe" id="assert-detalhe">Aguardando dados</div>
+    <aside class="assert-card" aria-label="Como funciona em 3 passos">
+      <div class="assert-num">3</div>
+      <div class="assert-label">Passos até o seu plano</div>
+      <div class="assert-detalhe">Detectar → Ajustar → Otimizar</div>
     </aside>
   </header>
 
   <main>
     <section class="bloco">
       <div class="bloco-head">
-        <h2>Classificação do Grupo C</h2>
-        <p>Como está a chave do Brasil na fase de grupos.</p>
+        <h2>Conte as specs do seu PC</h2>
+        <p>Clique em detectar automaticamente e corrija o que precisar — quanto mais certo, melhor o plano.</p>
       </div>
-      <div class="table-wrap">
-        <table class="tabela">
-          <thead>
-            <tr>
-              <th>#</th><th class="th-time">Seleção</th>
-              <th>J</th><th>V</th><th>E</th><th>D</th>
-              <th>GP</th><th>GC</th><th>SG</th><th>Pts</th>
-            </tr>
-          </thead>
-          <tbody id="grupo-body"></tbody>
-        </table>
-      </div>
+
+      <form id="specs-form" class="spec-form">
+        <button type="button" id="btn-detectar" class="btn-detectar">🔍 Detectar meu PC automaticamente</button>
+        <p class="deteccao-nota" id="deteccao-nota"></p>
+
+        <div class="form-grid">
+          <label class="campo">
+            <span>Placa de vídeo (GPU)</span>
+            <input type="text" id="gpu" placeholder="Ex.: RTX 3060, GTX 1650, Radeon RX 580..." autocomplete="off" />
+          </label>
+
+          <label class="campo">
+            <span>Processador (CPU)</span>
+            <input type="text" id="cpu" placeholder="Ex.: Ryzen 5 5600, Intel i5-11400..." autocomplete="off" />
+          </label>
+
+          <label class="campo">
+            <span>Memória RAM</span>
+            <select id="ram">
+              <option value="">Selecione</option>
+              <option value="4">4 GB</option>
+              <option value="8">8 GB</option>
+              <option value="16">16 GB</option>
+              <option value="32">32 GB</option>
+              <option value="64">64 GB ou mais</option>
+            </select>
+          </label>
+
+          <label class="campo">
+            <span>Armazenamento do jogo</span>
+            <select id="storage">
+              <option value="">Selecione</option>
+              <option value="hdd">HD comum (HDD)</option>
+              <option value="ssd">SSD SATA</option>
+              <option value="nvme">SSD NVMe</option>
+              <option value="desconhecido">Não sei</option>
+            </select>
+          </label>
+
+          <label class="campo">
+            <span>Sistema operacional</span>
+            <select id="sistema">
+              <option value="">Selecione</option>
+              <option value="win11">Windows 11</option>
+              <option value="win10">Windows 10</option>
+              <option value="outro">Outro</option>
+            </select>
+          </label>
+
+          <label class="campo">
+            <span>Qual jogo você quer otimizar? (opcional)</span>
+            <input type="text" id="jogo" placeholder="Ex.: Valorant, GTA V, Fortnite..." autocomplete="off" />
+          </label>
+        </div>
+
+        <fieldset class="objetivo-fieldset">
+          <legend>O que é mais importante pra você?</legend>
+          <label class="obj-opcao"><input type="radio" name="objetivo" value="fps" checked /> Mais FPS / fluidez</label>
+          <label class="obj-opcao"><input type="radio" name="objetivo" value="grafico" /> Melhor gráfico</label>
+          <label class="obj-opcao"><input type="radio" name="objetivo" value="equilibrado" /> Equilíbrio entre os dois</label>
+        </fieldset>
+
+        <button type="submit" class="btn-gerar">Gerar meu plano de otimização</button>
+      </form>
     </section>
 
-    <section class="bloco">
+    <section class="bloco" id="resultado-section" hidden>
       <div class="bloco-head">
-        <h2>Os jogos do Brasil</h2>
-        <p>Cada partida com a projeção, os placares mais prováveis e — quando o jogo já passou — a validação do palpite.</p>
+        <h2>Seu plano de otimização</h2>
+        <p>Baseado nas specs informadas e no jogo escolhido.</p>
       </div>
-      <div id="jogos-grid" class="jogos-grid">
-        <div class="loading">Carregando análise…</div>
-      </div>
+      <div id="resultado-conteudo"></div>
     </section>
 
     <section class="bloco como-funciona">
       <div class="bloco-head">
         <h2>Como funciona</h2>
-        <p>Uma análise estatística baseada em dados — sem achismo.</p>
+        <p>Uma IA de regras que conhece hardware de jogos — sem achismo, sem custo.</p>
       </div>
       <div class="cf-grid">
         <div class="cf-item">
           <span class="cf-num">01</span>
-          <h3>Força (Elo)</h3>
-          <p>Cada seleção recebe uma força a partir dos <strong>pontos FIFA</strong> (escala tipo Elo), ajustada pelo histórico de confrontos e pela forma recente — com peso menor para amostras pequenas.</p>
+          <h3>Reconhecimento</h3>
+          <p>A IA lê o que você digitou (placa de vídeo, processador, jogo) e reconhece <strong>padrões conhecidos de hardware</strong> pra identificar o nível real da sua máquina.</p>
         </div>
         <div class="cf-item">
           <span class="cf-num">02</span>
-          <h3>Gols (Poisson)</h3>
-          <p>Dessa força saem os gols esperados (λ) de cada lado. Um modelo de <strong>Poisson (Dixon-Coles)</strong> transforma os λ na probabilidade de cada placar.</p>
+          <h3>Nível da máquina</h3>
+          <p>GPU, CPU, RAM e armazenamento são combinados numa <strong>pontuação única</strong> — de entrada até enthusiast — que direciona todo o resto do plano.</p>
         </div>
         <div class="cf-item">
           <span class="cf-num">03</span>
-          <h3>Probabilidades</h3>
-          <p>Vitória, empate, derrota e o placar mais provável saem todos da <strong>mesma matriz</strong> de placares — de forma coerente, sem fórmulas separadas.</p>
+          <h3>Base de conhecimento</h3>
+          <p>Uma base com dezenas de recomendações de Windows, drivers, processos e configurações de jogo é <strong>filtrada e priorizada</strong> pro seu caso específico.</p>
         </div>
         <div class="cf-item destaque">
           <span class="cf-num">04</span>
-          <h3>Validação</h3>
-          <p>Quando o jogo acontece, o vencedor mais provável é comparado ao resultado real. Acertar o vencedor e o placar (±1 gol) alimenta o índice de assertividade.</p>
+          <h3>100% no navegador</h3>
+          <p>Nada é enviado pra nenhum servidor. Toda a análise roda no seu próprio navegador — por isso é gratuita e funciona pra sempre.</p>
         </div>
       </div>
     </section>
   </main>
 
   <footer>
-    <p class="fonte">Fontes: dados históricos verificados · enriquecimento via <a href="https://www.thesportsdb.com" rel="noopener" target="_blank">TheSportsDB</a></p>
-    <p class="assinatura">Análise e desenvolvimento por <a href="https://github.com/Roginie">Roginiê Almeida</a></p>
+    <p class="fonte">NexaBoost · Recomendações baseadas em boas práticas conhecidas de otimização de Windows e jogos.</p>
+    <p class="assinatura">Desenvolvido por <a href="https://github.com/Roginie">Roginiê Almeida</a></p>
   </footer>
 
-  <script defer src="app.js?v=4"></script>
+  <script defer src="app.js?v=1"></script>
 </body>
 </html>
