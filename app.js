@@ -238,7 +238,9 @@ function gerarPlano(specs) {
 }
 
 // ── DETECÇÃO AUTOMÁTICA (aproximada, via APIs do navegador) ──
-function detectarGPU() {
+const RENDERER_SOFTWARE = /microsoft basic render driver|swiftshader|llvmpipe|software rasterizer|basic render|vmware|virtualbox/i;
+
+function obterRendererBruto() {
   try {
     const canvas = document.createElement('canvas');
     const opcoes = { powerPreference: 'high-performance', failIfMajorPerformanceCaveat: false };
@@ -247,31 +249,37 @@ function detectarGPU() {
     if (!gl) return null;
     const ext = gl.getExtension('WEBGL_debug_renderer_info');
     if (!ext) return null;
-    const bruta = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
-    if (!bruta) return null;
-    // "ANGLE (Fabricante, Nome do renderer, Direct3D...)" → extrai só o nome
-    const match = bruta.match(/^ANGLE \([^,]+,\s*([^,]+),/i);
-    return match ? match[1].trim() : bruta;
+    return gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || null;
   } catch { return null; }
+}
+
+function detectarGPU(rendererBruto) {
+  if (!rendererBruto || RENDERER_SOFTWARE.test(rendererBruto)) return null;
+  // "ANGLE (Fabricante, Nome do renderer, Direct3D...)" → extrai só o nome
+  const match = rendererBruto.match(/^ANGLE \([^,]+,\s*([^,]+),/i);
+  return match ? match[1].trim() : rendererBruto;
 }
 
 function detectarSpecs() {
   const nucleos = navigator.hardwareConcurrency || null;
   const ramAprox = navigator.deviceMemory || null; // GB, limitado/aproximado pelo navegador (nunca reporta mais que 8)
-  const gpuBruta = detectarGPU();
+  const rendererBruto = obterRendererBruto();
+  const gpuBruta = detectarGPU(rendererBruto);
 
   const notas = [];
 
   if (gpuBruta) {
     document.getElementById('gpu').value = gpuBruta;
     notas.push(`GPU detectada: "${gpuBruta}". Se o seu PC/notebook tiver placa dedicada e o nome acima parecer uma placa integrada (Intel UHD/Iris, Radeon Graphics), o navegador pegou a GPU errada — corrija manualmente.`);
+  } else if (rendererBruto && RENDERER_SOFTWARE.test(rendererBruto)) {
+    notas.push('O Chrome só enxergou um driver de renderização por software, não sua placa de vídeo real — normalmente é porque a aceleração de hardware está desativada. Ative em chrome://settings/system → "Usar aceleração de gráficos quando disponível", reinicie o Chrome e clique em detectar de novo. Por enquanto, digite a GPU manualmente.');
   } else {
     notas.push('Não foi possível detectar a GPU automaticamente — informe manualmente.');
   }
 
   if (nucleos) {
-    const cpuAtual = document.getElementById('cpu').value;
-    if (!cpuAtual) document.getElementById('cpu').value = `(${nucleos} núcleos lógicos detectados — digite o modelo se souber)`;
+    const cpuInput = document.getElementById('cpu');
+    if (!cpuInput.value) cpuInput.placeholder = `${nucleos} núcleos lógicos detectados — digite o modelo se souber (ex.: Ryzen 5 5600)`;
     notas.push(`${nucleos} núcleos lógicos de CPU detectados.`);
   }
 
