@@ -35,13 +35,13 @@ a { color: var(--acento); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* ── HERO ───────────────────────────────────────────────── */
-.hero { max-width: 720px; margin: 0 auto; padding: 50px 22px 20px; }
+.hero { max-width: 980px; margin: 0 auto; padding: 50px 32px 20px; }
 .logo-wordmark { font-size: 0.95rem; font-weight: 700; color: var(--acento); margin-bottom: 18px; }
-.hero h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); }
-.lead { color: var(--cinza); font-size: 1rem; margin-top: 14px; max-width: 600px; }
+.hero h1 { font-size: clamp(1.8rem, 3.5vw, 2.5rem); }
+.lead { color: var(--cinza); font-size: 1rem; margin-top: 14px; max-width: 640px; }
 
 /* ── BLOCOS ─────────────────────────────────────────────── */
-main { max-width: 720px; margin: 0 auto; padding: 10px 22px 40px; }
+main { max-width: 980px; margin: 0 auto; padding: 10px 32px 40px; }
 .bloco { margin-top: 44px; }
 .bloco-head { margin-bottom: 18px; }
 .bloco-head h2 { font-size: 1.3rem; }
@@ -56,7 +56,7 @@ main { max-width: 720px; margin: 0 auto; padding: 10px 22px 40px; }
 .btn-detectar:hover { border-color: var(--acento); }
 .deteccao-nota { font-size: 0.8rem; color: var(--cinza-fraco); margin-top: 10px; min-height: 1.2em; }
 
-.form-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 20px; }
+.form-grid { display: grid; grid-template-columns: 1fr; gap: 16px 20px; margin-top: 20px; }
 .campo { display: flex; flex-direction: column; gap: 6px; font-size: 0.84rem; color: var(--cinza); }
 .campo input, .campo select {
   font-family: inherit; font-size: 0.92rem; color: var(--branco);
@@ -102,13 +102,18 @@ main { max-width: 720px; margin: 0 auto; padding: 10px 22px 40px; }
 .rec-desc { color: var(--cinza); font-size: 0.86rem; margin-top: 6px; line-height: 1.55; }
 
 /* ── SOBRE ──────────────────────────────────────────────── */
-.sobre-texto { color: var(--cinza); font-size: 0.9rem; max-width: 620px; }
+.sobre-texto { color: var(--cinza); font-size: 0.9rem; max-width: 760px; }
 
 /* ── FOOTER ─────────────────────────────────────────────── */
-footer { max-width: 720px; margin: 30px auto 0; padding: 26px 22px 50px; border-top: 1px solid var(--linha); color: var(--cinza-fraco); font-size: 0.82rem; }
+footer { max-width: 980px; margin: 30px auto 0; padding: 26px 32px 50px; border-top: 1px solid var(--linha); color: var(--cinza-fraco); font-size: 0.82rem; }
 footer .assinatura { margin-top: 6px; }
 
 /* ── RESPONSIVO ─────────────────────────────────────────── */
 @media (min-width: 620px) {
   .form-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 900px) {
+  .form-grid { grid-template-columns: repeat(3, 1fr); }
+  .categoria-itens { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .categoria-itens .recomendacao-item { margin-bottom: 0; }
 }

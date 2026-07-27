@@ -284,17 +284,19 @@ function renderResultado(plano) {
   const categoriasHtml = categorias.map(cat => `
     <div class="categoria-grupo">
       <div class="categoria-titulo">${cat.nome}</div>
-      ${cat.itens.map(item => `
-        <div class="recomendacao-item">
-          <div class="rec-topo">
-            <span class="rec-titulo">${item.titulo}</span>
-            <span class="rec-tags">
-              <span class="rec-tag">impacto ${item.impacto}</span>
-              <span class="rec-tag">${item.dificuldade}</span>
-            </span>
-          </div>
-          <p class="rec-desc">${item.desc}</p>
-        </div>`).join('')}
+      <div class="categoria-itens">
+        ${cat.itens.map(item => `
+          <div class="recomendacao-item">
+            <div class="rec-topo">
+              <span class="rec-titulo">${item.titulo}</span>
+              <span class="rec-tags">
+                <span class="rec-tag">impacto ${item.impacto}</span>
+                <span class="rec-tag">${item.dificuldade}</span>
+              </span>
+            </div>
+            <p class="rec-desc">${item.desc}</p>
+          </div>`).join('')}
+      </div>
     </div>`).join('');
 
   document.getElementById('resultado-conteudo').innerHTML = nivelHtml + categoriasHtml;
