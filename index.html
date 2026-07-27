@@ -3,42 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NexaBoost — IA de Otimização de PC para Jogos</title>
-  <meta name="description" content="NexaBoost: descubra o nível do seu PC e receba um plano de otimização gratuito e personalizado para jogar melhor, com mais FPS e menos travamentos." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <title>NexaBoost — Otimização de PC para jogos</title>
+  <meta name="description" content="Informe as specs do seu PC e receba uma lista de ajustes pra jogar com mais desempenho, sem gastar nada." />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <header class="hero">
-    <div class="hero-inner">
-      <p class="logo-wordmark">⚡ NexaBoost</p>
-      <p class="kicker">Otimização de PC · Gratuito</p>
-      <h1>Sua <span>IA</span> de otimização pra jogar melhor</h1>
-      <p class="lead">Conte as specs do seu PC (ou deixe a gente detectar) e o jogo que você quer rodar melhor. A IA monta um <strong>plano de otimização sob medida</strong> — mais FPS, menos travamento, tudo de graça.</p>
-      <div class="meta-bar">
-        <span class="status-pill">100% gratuito</span>
-        <span class="status-pill">Roda no navegador</span>
-        <span class="status-pill">Sem instalar nada</span>
-      </div>
-    </div>
-    <aside class="assert-card" aria-label="Como funciona em 3 passos">
-      <div class="assert-num">3</div>
-      <div class="assert-label">Passos até o seu plano</div>
-      <div class="assert-detalhe">Detectar → Ajustar → Otimizar</div>
-    </aside>
+    <p class="logo-wordmark">NexaBoost</p>
+    <h1>Deixe seu PC mais rápido pros jogos</h1>
+    <p class="lead">Preencha as specs do seu computador (ou use a detecção automática) e o jogo que você quer rodar melhor. No fim você recebe uma lista de ajustes pra ganhar desempenho — sem instalar nada e sem pagar nada.</p>
   </header>
 
   <main>
     <section class="bloco">
       <div class="bloco-head">
-        <h2>Conte as specs do seu PC</h2>
-        <p>Clique em detectar automaticamente e corrija o que precisar — quanto mais certo, melhor o plano.</p>
+        <h2>Specs do seu PC</h2>
+        <p>Clique em detectar automaticamente e corrija o que precisar — quanto mais certo, melhor o resultado.</p>
       </div>
 
       <form id="specs-form" class="spec-form">
-        <button type="button" id="btn-detectar" class="btn-detectar">🔍 Detectar meu PC automaticamente</button>
+        <button type="button" id="btn-detectar" class="btn-detectar">Detectar automaticamente</button>
         <p class="deteccao-nota" id="deteccao-nota"></p>
 
         <div class="form-grid">
@@ -98,13 +82,13 @@
           <label class="obj-opcao"><input type="radio" name="objetivo" value="equilibrado" /> Equilíbrio entre os dois</label>
         </fieldset>
 
-        <button type="submit" class="btn-gerar">Gerar meu plano de otimização</button>
+        <button type="submit" class="btn-gerar">Gerar lista de ajustes</button>
       </form>
     </section>
 
     <section class="bloco" id="resultado-section" hidden>
       <div class="bloco-head">
-        <h2>Seu plano de otimização</h2>
+        <h2>Resultado</h2>
         <p>Baseado nas specs informadas e no jogo escolhido.</p>
       </div>
       <div id="resultado-conteudo"></div>
@@ -112,39 +96,17 @@
 
     <section class="bloco como-funciona">
       <div class="bloco-head">
-        <h2>Como funciona</h2>
-        <p>Uma IA de regras que conhece hardware de jogos — sem achismo, sem custo.</p>
+        <h2>Sobre</h2>
       </div>
-      <div class="cf-grid">
-        <div class="cf-item">
-          <span class="cf-num">01</span>
-          <h3>Reconhecimento</h3>
-          <p>A IA lê o que você digitou (placa de vídeo, processador, jogo) e reconhece <strong>padrões conhecidos de hardware</strong> pra identificar o nível real da sua máquina.</p>
-        </div>
-        <div class="cf-item">
-          <span class="cf-num">02</span>
-          <h3>Nível da máquina</h3>
-          <p>GPU, CPU, RAM e armazenamento são combinados numa <strong>pontuação única</strong> — de entrada até enthusiast — que direciona todo o resto do plano.</p>
-        </div>
-        <div class="cf-item">
-          <span class="cf-num">03</span>
-          <h3>Base de conhecimento</h3>
-          <p>Uma base com dezenas de recomendações de Windows, drivers, processos e configurações de jogo é <strong>filtrada e priorizada</strong> pro seu caso específico.</p>
-        </div>
-        <div class="cf-item destaque">
-          <span class="cf-num">04</span>
-          <h3>100% no navegador</h3>
-          <p>Nada é enviado pra nenhum servidor. Toda a análise roda no seu próprio navegador — por isso é gratuita e funciona pra sempre.</p>
-        </div>
-      </div>
+      <p class="sobre-texto">As recomendações vêm de uma base de configurações conhecidas de Windows, drivers e jogos, cruzadas com as specs que você informa — GPU, CPU, RAM, armazenamento e o jogo escolhido definem quais dicas fazem sentido pro seu caso. Nada do que você digita sai do seu navegador; não tem cadastro, servidor ou coleta de dados.</p>
     </section>
   </main>
 
   <footer>
-    <p class="fonte">NexaBoost · Recomendações baseadas em boas práticas conhecidas de otimização de Windows e jogos.</p>
+    <p class="fonte">NexaBoost — recomendações baseadas em boas práticas conhecidas de otimização de Windows e jogos.</p>
     <p class="assinatura">Desenvolvido por <a href="https://github.com/Roginie">Roginiê Almeida</a></p>
   </footer>
 
-  <script defer src="app.js?v=1"></script>
+  <script defer src="app.js?v=2"></script>
 </body>
 </html>
