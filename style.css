@@ -35,13 +35,13 @@ a { color: var(--acento); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 /* ── HERO ───────────────────────────────────────────────── */
-.hero { max-width: 1280px; margin: 0 auto; padding: 50px 40px 20px; }
+.hero { max-width: 1680px; margin: 0 auto; padding: 50px clamp(20px, 4vw, 64px) 20px; }
 .logo-wordmark { font-size: 0.95rem; font-weight: 700; color: var(--acento); margin-bottom: 18px; }
 .hero h1 { font-size: clamp(1.8rem, 3.5vw, 2.5rem); }
 .lead { color: var(--cinza); font-size: 1rem; margin-top: 14px; max-width: 640px; }
 
 /* ── BLOCOS ─────────────────────────────────────────────── */
-main { max-width: 1280px; margin: 0 auto; padding: 10px 40px 40px; }
+main { max-width: 1680px; margin: 0 auto; padding: 10px clamp(20px, 4vw, 64px) 40px; }
 .bloco { margin-top: 44px; }
 .bloco-head { margin-bottom: 18px; }
 .bloco-head h2 { font-size: 1.3rem; }
@@ -105,7 +105,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 10px 40px 40px; }
 .sobre-texto { color: var(--cinza); font-size: 0.9rem; max-width: 760px; }
 
 /* ── FOOTER ─────────────────────────────────────────────── */
-footer { max-width: 1280px; margin: 30px auto 0; padding: 26px 40px 50px; border-top: 1px solid var(--linha); color: var(--cinza-fraco); font-size: 0.82rem; }
+footer { max-width: 1680px; margin: 30px auto 0; padding: 26px clamp(20px, 4vw, 64px) 50px; border-top: 1px solid var(--linha); color: var(--cinza-fraco); font-size: 0.82rem; }
 footer .assinatura { margin-top: 6px; }
 
 /* ── RESPONSIVO ─────────────────────────────────────────── */
