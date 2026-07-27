@@ -43,10 +43,11 @@ const CPU_TIERS = [
 function tierCPU(texto, nucleos) {
   const direto = tierPorTexto(texto, CPU_TIERS);
   if (direto !== null) return direto;
+  // nucleos = núcleos lógicos (conta hyperthreading/SMT em dobro na maioria das CPUs atuais)
   if (nucleos) {
     if (nucleos <= 4) return 1;
-    if (nucleos <= 6) return 2;
-    if (nucleos <= 8) return 3;
+    if (nucleos <= 8) return 2;
+    if (nucleos <= 12) return 3;
     return 4;
   }
   return 2; // desconhecido → assume médio, neutro
@@ -240,24 +241,30 @@ function gerarPlano(specs) {
 function detectarGPU() {
   try {
     const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    const opcoes = { powerPreference: 'high-performance', failIfMajorPerformanceCaveat: false };
+    const gl = canvas.getContext('webgl2', opcoes) || canvas.getContext('webgl', opcoes)
+      || canvas.getContext('experimental-webgl', opcoes);
     if (!gl) return null;
     const ext = gl.getExtension('WEBGL_debug_renderer_info');
     if (!ext) return null;
-    return gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || null;
+    const bruta = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+    if (!bruta) return null;
+    // "ANGLE (Fabricante, Nome do renderer, Direct3D...)" → extrai só o nome
+    const match = bruta.match(/^ANGLE \([^,]+,\s*([^,]+),/i);
+    return match ? match[1].trim() : bruta;
   } catch { return null; }
 }
 
 function detectarSpecs() {
   const nucleos = navigator.hardwareConcurrency || null;
-  const ramAprox = navigator.deviceMemory || null; // GB, limitado/aproximado pelo navegador
+  const ramAprox = navigator.deviceMemory || null; // GB, limitado/aproximado pelo navegador (nunca reporta mais que 8)
   const gpuBruta = detectarGPU();
 
   const notas = [];
 
   if (gpuBruta) {
     document.getElementById('gpu').value = gpuBruta;
-    notas.push(`GPU detectada: "${gpuBruta}"`);
+    notas.push(`GPU detectada: "${gpuBruta}". Se o seu PC/notebook tiver placa dedicada e o nome acima parecer uma placa integrada (Intel UHD/Iris, Radeon Graphics), o navegador pegou a GPU errada — corrija manualmente.`);
   } else {
     notas.push('Não foi possível detectar a GPU automaticamente — informe manualmente.');
   }
@@ -268,12 +275,14 @@ function detectarSpecs() {
     notas.push(`${nucleos} núcleos lógicos de CPU detectados.`);
   }
 
-  if (ramAprox) {
+  if (ramAprox && ramAprox < 8) {
     const ramSelect = document.getElementById('ram');
     const opcoes = Object.keys(RAM_TIER).map(Number).sort((a, b) => a - b);
     const aproxEscolhido = opcoes.find(o => o >= ramAprox) || opcoes[opcoes.length - 1];
     ramSelect.value = String(aproxEscolhido);
-    notas.push(`RAM aproximada: ${ramAprox} GB (navegadores limitam essa informação por privacidade — confira e corrija se souber o valor real).`);
+    notas.push(`RAM aproximada: ${ramAprox} GB.`);
+  } else if (ramAprox === 8) {
+    notas.push('O navegador detectou "8 GB ou mais", mas nunca informa o valor real acima disso — selecione manualmente a RAM certa do seu PC.');
   } else {
     notas.push('Não foi possível detectar a RAM automaticamente — selecione manualmente.');
   }
